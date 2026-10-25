@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dice Tactics — Prototype</title>
+<style>
+:root{
+  --bg:#1c211f; --board:#2a3530; --sq:#33403a; --sq-line:#44544c;
+  --ink:#eae6da; --muted:#9aa89f; --p1:#e8ddc3; --p1-ink:#2a2416;
+  --p2:#4d6a63; --p2-ink:#eae6da; --throne:#b68a3e; --throne-ink:#241c08;
+  --move:#5fb3a3; --atk:#c0564a; --accent:#d9a441;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{display:flex;justify-content:center;padding:28px 14px;min-height:100vh}
+#layout{display:flex;gap:28px;align-items:stretch;flex-wrap:wrap;justify-content:center;width:100%}
+#boardCol{display:flex;flex-direction:column;align-items:center}
+#sideCol{width:220px;display:flex;flex-direction:column;justify-content:space-between}
+#sideTop{display:flex;flex-direction:column;gap:14px}
+h1{font-size:1.15rem;font-weight:700;margin:0;letter-spacing:.2px;text-align:left}
+#status{font-size:.9rem;color:var(--muted);min-height:1.4em;text-align:left}
+#status b{color:var(--accent)}
+#boardWrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.throneRow{display:flex;justify-content:center;width:100%}
+#grid{display:grid;grid-template-columns:repeat(5,minmax(0,44px));grid-auto-rows:minmax(0,44px);gap:3px;background:var(--board);padding:6px;border-radius:6px}
+.cell{position:relative;background:var(--sq);border:1px solid var(--sq-line);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;cursor:default}
+.cell.throne{background:var(--sq)}
+.cell.throne.active-turn{border-color:var(--accent)}
+.cell.movable{box-shadow:inset 0 0 0 2px var(--move);cursor:pointer}
+.cell.attackable{box-shadow:inset 0 0 0 2px var(--atk);cursor:pointer}
+.cell.selected{box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.active-turn{box-shadow:0 0 0 3px var(--accent), 0 0 10px 1px var(--accent)}
+.piece{width:38px;height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:.6rem;font-weight:700;line-height:1;cursor:pointer;user-select:none;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.piece.P1{background:var(--p1);color:var(--p1-ink)}
+.piece.P2{background:var(--p2);color:var(--p2-ink)}
+.piece .hp{font-size:.95rem;font-weight:700;opacity:.95}
+.piece.king{width:42px;height:42px;cursor:default}
+#controls{display:flex; flex-direction:column; align-items:stretch; gap:8px}
+button{background:var(--accent);color:#241c08;border:none;border-radius:6px;padding:9px 16px;font-size:.9rem;font-weight:700;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.secondary{background:transparent;color:var(--ink);border:1px solid var(--sq-line)}
+#compareBtn{
+  background:none;border:none;color:var(--muted);font-size:.78rem;font-weight:600;
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:2px 4px;text-align:left;
+}
+#compareBtn:hover{color:var(--ink)}
+.turnRow{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted)}
+.turnDot{width:10px;height:10px;border-radius:50%;flex:none}
+.turnDot.P1{background:var(--p1)}
+.turnDot.P2{background:var(--p2)}
+
+.selPanel{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.selHeader{display:flex;align-items:center;gap:10px}
+.selSwatch{width:30px;height:30px;flex:none;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.selSwatch.P1{background:var(--p1)}
+.selSwatch.P2{background:var(--p2)}
+
+.iconRow .rowLabel{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.iconRow .icons{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+
+.sword{width:16px;height:16px;flex:none}
+.sword.avail{color:var(--atk)}
+.sword.spent{color:var(--sq-line)}
+
+.pip{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--sq-line);flex:none;position:relative;box-sizing:border-box}
+.pip.avail{background:var(--move);border-color:var(--move)}
+.pip.locked{border-color:var(--atk)}
+.pip.locked::after{content:'';position:absolute;left:0;right:0;top:50%;height:1.5px;background:var(--atk);transform:translateY(-50%) rotate(45deg)}
+
+.floatNum{position:absolute;left:50%;top:6%;transform:translateX(-50%);font-weight:800;font-size:.85rem;
+  color:#ffdfd9;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;animation:floatUp .9s ease-out forwards;z-index:5}
+@keyframes floatUp{
+  0%{opacity:0;transform:translate(-50%,0) scale(.8)}
+  15%{opacity:1;transform:translate(-50%,-6px) scale(1.05)}
+  100%{opacity:0;transform:translate(-50%,-34px) scale(1)}
+}
+.piece.dying{animation:pieceDeath .55s ease-in forwards;pointer-events:none}
+@keyframes pieceDeath{
+  0%{opacity:1;transform:scale(1) rotate(0)}
+  100%{opacity:0;transform:scale(.3) rotate(25deg)}
+}
+.piece.destroyed{opacity:.35}
+#compareView{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:820px}
+.mini{display:flex;flex-direction:column;align-items:center;gap:6px}
+.mini h3{margin:0;font-size:.85rem}
+.mini p{margin:0;font-size:.7rem;color:var(--muted)}
+.miniGrid{display:grid;grid-template-columns:repeat(13,minmax(0,14px));grid-auto-rows:minmax(0,14px);gap:2px;background:var(--board);padding:4px;border-radius:4px}
+.miniCell{background:var(--sq);border:1px solid var(--sq-line);border-radius:2px}
+.miniCell.reach{background:var(--move)}
+.miniCell.origin{background:var(--accent)}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f4f1ea;--board:#dcd6c6;--sq:#eceadf;--sq-line:#c9c2ab;--ink:#2a2d27;--muted:#6b6f64;
+    --p1:#fff6e0;--p1-ink:#2a2416;--p2:#3c5950;--p2-ink:#f4f1ea;--throne:#c99b3f;--throne-ink:#241c08;
+    color-scheme: light;
+  }
+}
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="boardCol">
+    <div id="boardWrap">
+      <div class="throneRow" id="throneTop"></div>
+      <div id="grid"></div>
+      <div class="throneRow" id="throneBottom"></div>
+    </div>
+    <div id="compareView" style="display:none"></div>
+  </div>
+  <div id="sideCol">
+    <div id="sideTop">
+      <h1>Dice Tactics — Core Loop Prototype</h1>
+      <div id="status"></div>
+    </div>
+    <div id="controls">
+      <button id="endTurnBtn">End turn</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+      <button id="compareBtn">Compare all move patterns</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DICE = {
+  d4:{sides:4, attacks:3, move:6, dirs:'diag'},
+  d6:{sides:6, attacks:2, move:4, dirs:'ortho'},
+  d8:{sides:8, attacks:1, move:3, dirs:'omni'},
+  d10:{sides:10,attacks:1, move:2, dirs:'area'},
+  d12:{sides:12,attacks:1, move:1, dirs:'omni'},
+  d20:{sides:20,attacks:0, move:1, dirs:'omni'}, // the throne piece — moves like a d12, never attacks
+};
+const DIE_SHAPE = {
+  d4:  {vb:'0 0 251 217', d:'M126.941 0.000169414C131.194 0.0229137 135.117 2.29469 137.254 5.97185L249.376 198.972C251.532 202.684 251.542 207.266 249.4 210.986C247.259 214.707 243.293 217 239 217H11.9998C7.6841 217 3.70111 214.683 1.56814 210.931C-0.564788 207.179 -0.519096 202.571 1.68826 198.862L116.565 5.86247L116.775 5.52361C118.988 2.07076 122.822 -0.0216776 126.941 0.000169414Z'},
+  d6:  {vb:'0 0 199 199', d:'M187 0C193.627 0 199 5.37258 199 12V187C199 193.627 193.627 199 187 199H12C5.37258 199 0 193.627 0 187V12C0 5.37258 5.37258 0 12 0H187Z'},
+  d8:  {vb:'0 0 255 266', d:'M126.025 0.000219838C129.291 -0.0195343 132.424 1.29276 134.701 3.63401L251.602 123.845C256.111 128.481 256.135 135.856 251.657 140.522L134.756 262.31C132.475 264.685 129.318 266.02 126.025 266C122.732 265.98 119.592 264.607 117.341 262.204L3.243 140.415C-1.10109 135.778 -1.07832 128.559 3.29573 123.95L117.394 3.73948C119.643 1.37082 122.759 0.0200554 126.025 0.000219838Z'},
+  d10: {vb:'0 0 232 282', d:'M106.681 3.33198C111.281 -1.072 118.52 -1.11553 123.173 3.23237L205.943 80.579C240.472 112.847 240.65 167.547 206.331 200.038L123.23 278.714L122.784 279.115C118.106 283.126 111.094 282.949 106.624 278.613L24.9064 199.347C-8.45302 166.988 -8.27834 113.399 25.2912 81.2578L106.681 3.33198Z'},
+  d12: {vb:'0 0 251 240', d:'M118.123 2.29178C122.329 -0.763938 128.025 -0.763915 132.231 2.29178L245.406 84.5183C249.612 87.5741 251.372 92.9911 249.766 97.9353L206.536 230.981C204.93 235.925 200.322 239.273 195.123 239.273H55.2306C50.0321 239.273 45.4241 235.925 43.8176 230.981L0.588068 97.9353C-1.01838 92.9912 0.74185 87.5741 4.94744 84.5183L118.123 2.29178Z'},
+  d20: {vb:'0 0 228 254', d:'M108.216 1.48631C111.936 -0.561129 116.476 -0.493413 120.142 1.69041L222.142 62.4599C225.774 64.6241 228 68.5401 228 72.7685V183.51C228 187.809 225.7 191.781 221.97 193.92L119.97 252.41C116.273 254.53 111.727 254.53 108.03 252.41L6.03027 193.92C2.30044 191.781 5.4427e-06 187.809 0 183.51V72.7685C6.29085e-05 68.5401 2.2258 64.6241 5.8584 62.4599L107.858 1.69041L108.216 1.48631Z'}
+};
+// a square silhouette reads visually larger than a diamond/triangle/pentagon
+// inscribed in the same bounding box, so the d6 gets a small compensating scale-down
+const DIE_VISUAL_SCALE = { d6: 0.72 };
+
+// flexbox centers the label on the bounding-box center, but a shape's visual
+// mass isn't always there (a triangle is bottom-heavy, a pentagon slightly so) —
+// nudge the label down (positive px) to sit on the shape's visual center instead
+const DIE_LABEL_OFFSET = { d4: 3.5, d12: 2 };
+
+function applyDieShape(el, type){
+  const s = DIE_SHAPE[type];
+  if(!s) return;
+  const uri = 'url("data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${s.vb}"><path d="${s.d}" fill="black"/></svg>`
+  ) + '")';
+  el.style.webkitMaskImage = uri;
+  el.style.maskImage = uri;
+  const scale = DIE_VISUAL_SCALE[type];
+  const size = scale ? (scale*100)+'%' : 'contain';
+  el.style.webkitMaskSize = size;
+  el.style.maskSize = size;
+  const offset = DIE_LABEL_OFFSET[type];
+  const hp = el.querySelector('.hp');
+  if(hp && offset) hp.style.transform = `translateY(${offset}px)`;
+}
+
+const DIAG=[[1,1],[1,-1],[-1,1],[-1,-1]];
+const ORTHO=[[1,0],[-1,0],[0,1],[0,-1]];
+const OMNI=[...DIAG,...ORTHO];
+const dirsFor = d => d.dirs==='diag'?DIAG : d.dirs==='ortho'?ORTHO : OMNI;
+
+let pieces, turn, selected, movesLeft, attacksLeft, gameOver, actedThisTurn, moveLocked;
+let floaters = [];     // transient floating damage numbers: {row,col,text,until}
+let dyingGhosts = [];  // transient fade-out silhouettes for just-destroyed pieces
+
+const SWORD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%">
+  <path d="M12 2 L12 14"/>
+  <path d="M9 5 L12 2 L15 5"/>
+  <path d="M7.5 14 L16.5 14"/>
+  <path d="M12 14 L12 20"/>
+  <circle cx="12" cy="21.3" r="1.1" fill="currentColor" stroke="none"/>
+</svg>`;
+
+function makeSwordIcon(cls){
+  const d = document.createElement('div');
+  d.className = 'sword ' + cls;
+  d.innerHTML = SWORD_SVG;
+  return d;
+}
+
+function makePip(cls){
+  const d = document.createElement('div');
+  d.className = 'pip ' + cls;
+  return d;
+}
+
+function spawnFloater(row, col, text){
+  const f = { row, col, text };
+  floaters.push(f);
+  setTimeout(() => { floaters = floaters.filter(x => x !== f); render(); }, 900);
+}
+
+function spawnDeathGhost(piece){
+  const g = { type: piece.type, player: piece.player, row: piece.row, col: piece.col };
+  dyingGhosts.push(g);
+  setTimeout(() => { dyingGhosts = dyingGhosts.filter(x => x !== g); render(); }, 600);
+}
+
+function freshPieces(){
+  const order=['d4','d6','d8','d10','d12'];
+  const arr=[];
+  order.forEach((t,c)=>{
+    // P2's row is mirrored left-right on screen (so each player sees their own
+    // d4-to-d12 gradient running the same direction relative to their own throne)
+    arr.push({id:'P1-'+t, player:'P1', type:t, row:1, col:c, hp:DICE[t].sides, maxHp:DICE[t].sides});
+    arr.push({id:'P2-'+t, player:'P2', type:t, row:8, col:(order.length-1-c), hp:DICE[t].sides, maxHp:DICE[t].sides});
+  });
+  arr.push({id:'P1-king', player:'P1', type:'d20', row:0, col:2, hp:20, maxHp:20, king:true});
+  arr.push({id:'P2-king', player:'P2', type:'d20', row:9, col:2, hp:20, maxHp:20, king:true});
+  return arr;
+}
+
+function reset(){
+  pieces = freshPieces();
+  turn='P1'; selected=null; movesLeft=0; attacksLeft=0; gameOver=null; actedThisTurn=false; moveLocked=false;
+  floaters=[]; dyingGhosts=[];
+  render();
+}
+
+// a destroyed king is deliberately NOT filtered out here (p.king short-circuits
+// the hp check) so its square keeps rendering — dimmed — instead of vanishing
+// the instant the game ends; endTurn() never runs again after that, so a dead
+// king never gets swept up by the normal end-of-turn corpse cleanup below.
+function pieceAt(row,col){ return pieces.find(p=>p.row===row && p.col===col && (p.hp>0 || p.king)); }
+function inBounds(row,col){ return row>=1 && row<=8 && col>=0 && col<=4; }
+
+function reflect(x, d, lo, hi){
+  let nx = x + d;
+  if(nx > hi){ nx = 2*hi - nx; d = -d; }
+  else if(nx < lo){ nx = 2*lo - nx; d = -d; }
+  return [nx, d];
+}
+
+function legalMoves(p, cap){
+  if(cap<=0) return [];
+  if(p.king) return kingMoves(p, cap);
+  const d=DICE[p.type], out=[];
+  if(d.dirs==='area'){
+    // fills the whole square block within range, not just the 8 straight/diagonal rays
+    for(let dr=-d.move; dr<=d.move; dr++){
+      for(let dc=-d.move; dc<=d.move; dc++){
+        if(dr===0 && dc===0) continue;
+        const dist = Math.max(Math.abs(dr),Math.abs(dc));
+        if(dist>cap) continue;
+        const nr=p.row+dr, nc=p.col+dc;
+        if(!inBounds(nr,nc)) continue;
+        if(pieceAt(nr,nc)) continue;
+        out.push({row:nr, col:nc, steps:dist});
+      }
+    }
+    return out;
+  }
+  const dirs=dirsFor(d);
+  for(const [dr0,dc0] of dirs){
+    let r=p.row, c=p.col, dr=dr0, dc=dc0;
+    for(let step=1; step<=cap; step++){
+      let nr, nc;
+      if(d.dirs==='diag'){
+        // diagonal movers bounce off the board edges like a mirror,
+        // so they still get their full move range on a narrower board
+        const rr=reflect(r,dr,1,8), cc=reflect(c,dc,0,4);
+        nr=rr[0]; dr=rr[1]; nc=cc[0]; dc=cc[1];
+      } else {
+        nr=r+dr; nc=c+dc;
+        if(!inBounds(nr,nc)) break;
+      }
+      if(pieceAt(nr,nc)) break;
+      out.push({row:nr, col:nc, steps:step}); r=nr; c=nc;
+    }
+  }
+  return out;
+}
+
+function kingMoves(p, cap){
+  // the throne (row 0 for P1, row 9 for P2) connects to exactly one board
+  // square — col 2 of the near edge — so from the throne the only legal
+  // move is stepping onto that square. From the board, the king moves like
+  // a d12 (one square, any direction), and can step back onto its own
+  // throne from that same connecting square.
+  const throneRow = p.player==='P1' ? 0 : 9;
+  const gateRow = p.player==='P1' ? 1 : 8;
+  const out=[];
+  if(p.row===throneRow){
+    if(!pieceAt(gateRow,2)) out.push({row:gateRow,col:2,steps:1});
+    return out;
+  }
+  for(const [dr,dc] of OMNI){
+    const nr=p.row+dr, nc=p.col+dc;
+    if(inBounds(nr,nc) && !pieceAt(nr,nc)) out.push({row:nr,col:nc,steps:1});
+  }
+  if(p.row===gateRow && p.col===2 && !pieceAt(throneRow,2)) out.push({row:throneRow,col:2,steps:1});
+  return out;
+}
+
+function adjacentEnemies(p){
+  const out=[];
+  for(const [dr,dc] of OMNI){
+    const r=p.row+dr, c=p.col+dc;
+    const t=pieceAt(r,c);
+    if(t && t.player!==p.player) out.push(t);
+  }
+  return out;
+}
+
+const PATTERN_RADIUS = 6; // matches the longest move range (d4), so every die renders on the same-size grid
+
+function patternMovesFree(type){
+  // pure direction x range, no board edges, no bounce, no blockers —
+  // this is the die's theoretical reach in open space
+  const d=DICE[type];
+  if(d.dirs==='area'){
+    const out=[];
+    for(let dr=-d.move; dr<=d.move; dr++){
+      for(let dc=-d.move; dc<=d.move; dc++){
+        if(dr===0 && dc===0) continue;
+        if(Math.max(Math.abs(dr),Math.abs(dc))<=d.move) out.push({row:dr, col:dc});
+      }
+    }
+    return out;
+  }
+  const dirs=dirsFor(d), out=[];
+  for(const [dr,dc] of dirs){
+    for(let step=1; step<=d.move; step++) out.push({row:dr*step, col:dc*step});
+  }
+  return out;
+}
+
+function renderCompare(){
+  const order=['d4','d6','d8','d10','d12'];
+  const el=document.getElementById('compareView');
+  el.innerHTML='';
+  order.forEach((type)=>{
+    const reach=patternMovesFree(type);
+    const wrap=document.createElement('div');
+    wrap.className='mini';
+    const h=document.createElement('h3'); h.textContent=type.toUpperCase();
+    const p=document.createElement('p');
+    const d=DICE[type];
+    p.textContent=`${d.dirs} \u00b7 ${d.move}sq \u00b7 ${d.attacks} atk`;
+    const g=document.createElement('div'); g.className='miniGrid';
+    for(let r=PATTERN_RADIUS;r>=-PATTERN_RADIUS;r--){
+      for(let c=-PATTERN_RADIUS;c<=PATTERN_RADIUS;c++){
+        const cell=document.createElement('div');
+        cell.className='miniCell';
+        if(r===0 && c===0) cell.classList.add('origin');
+        else if(reach.some(m=>m.row===r&&m.col===c)) cell.classList.add('reach');
+        g.appendChild(cell);
+      }
+    }
+    wrap.appendChild(h); wrap.appendChild(p); wrap.appendChild(g);
+    el.appendChild(wrap);
+  });
+}
+
+let compareOpen=false;
+function toggleCompare(){
+  compareOpen=!compareOpen;
+  document.getElementById('boardWrap').style.display = compareOpen?'none':'flex';
+  document.getElementById('compareView').style.display = compareOpen?'flex':'none';
+  document.getElementById('compareBtn').textContent = compareOpen?'Back to board':'Compare all move patterns';
+  if(compareOpen) renderCompare();
+}
+
+function selectPiece(p){
+  if(gameOver || p.player!==turn || p.hp<=0) return;
+  if(actedThisTurn && p!==selected) return;
+  if(p===selected) return; // already the active piece this turn — don't reset its remaining budget
+  selected=p; movesLeft=DICE[p.type].move; attacksLeft=DICE[p.type].attacks; moveLocked=false;
+  render();
+}
+
+function doMove(row,col,steps){
+  if(gameOver) return;
+  selected.row=row; selected.col=col; movesLeft-=steps; actedThisTurn=true;
+  if(movesLeft<=0 && attacksLeft<=0) endTurn();
+  else render();
+}
+
+function doAttack(target){
+  if(gameOver) return;
+  actedThisTurn=true;
+  if(movesLeft>0) moveLocked=true; // there was leftover movement budget — attacking forfeits it
+  movesLeft=0; // attacking locks the piece in place for the rest of the turn
+  const dmg = 1+Math.floor(Math.random()*DICE[selected.type].sides);
+  target.hp -= dmg;
+  attacksLeft--;
+  spawnFloater(target.row, target.col, String(dmg));
+  if(target.hp<=0){
+    if(target.king) gameOver = turn;
+    spawnDeathGhost(target);
+  }
+  if(!gameOver && attacksLeft<=0 && movesLeft<=0) endTurn();
+  else render();
+}
+
+function endTurn(){
+  pieces = pieces.filter(p=>p.hp>0);
+  selected=null; movesLeft=0; attacksLeft=0; actedThisTurn=false; moveLocked=false;
+  turn = turn==='P1' ? 'P2' : 'P1';
+  render();
+}
+
+let statusExtra='';
+
+function addFloaters(cellDiv, row, col){
+  floaters.filter(f => f.row===row && f.col===col).forEach(f => {
+    const fd = document.createElement('div');
+    fd.className = 'floatNum';
+    fd.textContent = f.text;
+    cellDiv.appendChild(fd);
+  });
+}
+
+function addGhost(cellDiv, row, col){
+  const g = dyingGhosts.find(x => x.row===row && x.col===col);
+  if(!g) return;
+  const gd = document.createElement('div');
+  gd.className = 'piece dying ' + g.player;
+  applyDieShape(gd, g.type);
+  cellDiv.appendChild(gd);
+}
+
+function render(){
+  const grid=document.getElementById('grid');
+  const top=document.getElementById('throneTop');
+  const bottom=document.getElementById('throneBottom');
+  grid.innerHTML=''; top.innerHTML=''; bottom.innerHTML='';
+
+  const moves = selected && movesLeft>0 && !gameOver ? legalMoves(selected, movesLeft) : [];
+  const targets = selected && attacksLeft>0 && !gameOver ? adjacentEnemies(selected) : [];
+
+  // Shared by the two throne squares and every board square — the king is
+  // now a mobile piece (d12-pattern movement, never attacks), so wherever it
+  // currently sits needs the same rendering as any other die. pieceAt still
+  // returns a destroyed king (see pieceAt) so its square stays visible,
+  // dimmed, instead of vanishing the instant the game ends. A throne with no
+  // king currently on it (it's out roaming the board) still gets a square —
+  // shown as a legal landing spot if the selected king can step back onto it.
+  function buildCellDiv(row,col,isThrone){
+    const cell=document.createElement('div');
+    cell.className='cell'+(isThrone?' throne':'');
+    const mv = moves.find(m=>m.row===row&&m.col===col);
+    if(mv){ cell.classList.add('movable'); cell.onclick=()=>doMove(mv.row,mv.col,mv.steps); }
+    const p = pieceAt(row,col);
+    if(p){
+      const destroyed = p.hp<=0;
+      if(p===selected) cell.classList.add('selected');
+      const isTarget = targets.includes(p);
+      if(isTarget) cell.classList.add('attackable');
+      if(isThrone && p.king && p.player===turn && !gameOver && !destroyed) cell.classList.add('active-turn');
+      const pdiv=document.createElement('div');
+      pdiv.className='piece '+p.player+(p.king?' king':'')+(isTarget?' target':'')+(destroyed?' destroyed':'');
+      pdiv.innerHTML=`<div class="hp">${Math.max(0,p.hp)}</div>`;
+      applyDieShape(pdiv,p.type);
+      if(isTarget){ pdiv.onclick=(e)=>{ e.stopPropagation(); doAttack(p); }; }
+      else if(!destroyed && p.player===turn && !gameOver){ pdiv.onclick=(e)=>{ e.stopPropagation(); selectPiece(p); }; }
+      cell.appendChild(pdiv);
+    } else {
+      addGhost(cell, row, col);
+    }
+    addFloaters(cell, row, col);
+    return cell;
+  }
+
+  // P2 throne on top (row9), P1 throne on bottom (row1 side)
+  top.appendChild(buildCellDiv(9,2,true));
+  bottom.appendChild(buildCellDiv(0,2,true));
+
+  for(let r=8;r>=1;r--){
+    for(let c=0;c<5;c++){
+      grid.appendChild(buildCellDiv(r,c,false));
+    }
+  }
+
+  renderSidebar();
+  document.getElementById('endTurnBtn').disabled = !!gameOver;
+}
+
+function renderSidebar(){
+  const statusEl=document.getElementById('status');
+  statusEl.innerHTML='';
+
+  const turnRow=document.createElement('div');
+  turnRow.className='turnRow';
+  const dot=document.createElement('div');
+  dot.className='turnDot '+(gameOver||turn);
+  turnRow.appendChild(dot);
+  const label=document.createElement('span');
+  label.innerHTML = gameOver ? `<b>${gameOver} wins</b>` : `<b>${turn}</b>'s turn`;
+  turnRow.appendChild(label);
+  statusEl.appendChild(turnRow);
+
+  if(!gameOver && selected){
+    const panel=document.createElement('div');
+    panel.className='selPanel';
+
+    const header=document.createElement('div');
+    header.className='selHeader';
+    const swatch=document.createElement('div');
+    swatch.className='selSwatch '+selected.player;
+    applyDieShape(swatch, selected.type);
+    header.appendChild(swatch);
+    panel.appendChild(header);
+
+    const maxAtk=DICE[selected.type].attacks;
+    if(maxAtk>0){
+      const atkWrap=document.createElement('div');
+      atkWrap.className='iconRow';
+      const atkLabel=document.createElement('div'); atkLabel.className='rowLabel'; atkLabel.textContent='Attacks';
+      const atkIcons=document.createElement('div'); atkIcons.className='icons';
+      for(let i=0;i<maxAtk;i++) atkIcons.appendChild(makeSwordIcon(i<attacksLeft?'avail':'spent'));
+      atkWrap.appendChild(atkLabel); atkWrap.appendChild(atkIcons);
+      panel.appendChild(atkWrap);
+    }
+
+    const mvWrap=document.createElement('div');
+    mvWrap.className='iconRow';
+    const mvLabel=document.createElement('div'); mvLabel.className='rowLabel'; mvLabel.textContent='Move';
+    const mvIcons=document.createElement('div'); mvIcons.className='icons';
+    const maxMv=DICE[selected.type].move;
+    for(let i=0;i<maxMv;i++){
+      const cls = i<movesLeft ? 'avail' : (moveLocked ? 'locked' : 'spent');
+      mvIcons.appendChild(makePip(cls));
+    }
+    mvWrap.appendChild(mvLabel); mvWrap.appendChild(mvIcons);
+    panel.appendChild(mvWrap);
+
+    statusEl.appendChild(panel);
+  }
+}
+
+document.getElementById('endTurnBtn').onclick=()=>{ if(!gameOver) endTurn(); };
+document.getElementById('resetBtn').onclick=reset;
+document.getElementById('compareBtn').onclick=toggleCompare;
+reset();
+</script>
+</body>
+</html>
