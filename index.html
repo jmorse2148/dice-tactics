@@ -10,23 +10,28 @@
   --ink:#eae6da; --muted:#9aa89f; --p1:#e8ddc3; --p1-ink:#2a2416;
   --p2:#4d6a63; --p2-ink:#eae6da; --throne:#b68a3e; --throne-ink:#241c08;
   --move:#5fb3a3; --atk:#c0564a; --accent:#d9a441;
+  --cell: clamp(52px, 7.4vh, 88px);
   color-scheme: dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{display:flex;justify-content:center;padding:28px 14px;min-height:100vh}
-#layout{display:flex;gap:28px;align-items:stretch;flex-wrap:wrap;justify-content:center;width:100%}
-#boardCol{display:flex;flex-direction:column;align-items:center}
-#sideCol{width:220px;display:flex;flex-direction:column;justify-content:space-between}
+body{display:flex;min-height:100vh}
+/* Board gets the whole left region and centers within it; sidebar is a
+   fixed-width column pinned to the right edge of the viewport. No wrapping —
+   below the breakpoint we swap to a "use a computer" message instead. */
+#layout{display:flex;width:100%;min-height:100vh}
+#boardCol{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:32px;gap:16px}
+#sideCol{flex:none;width:220px;display:flex;flex-direction:column;justify-content:space-between;
+  padding:32px 32px 32px 26px;border-left:1px solid var(--sq-line)}
 #sideTop{display:flex;flex-direction:column;gap:14px}
 h1{font-size:1.15rem;font-weight:700;margin:0;letter-spacing:.2px;text-align:left}
 #status{font-size:.9rem;color:var(--muted);min-height:1.4em;text-align:left}
 #status b{color:var(--accent)}
 #boardWrap{display:flex;flex-direction:column;align-items:center;gap:4px}
 .throneRow{display:flex;justify-content:center;width:100%}
-#grid{display:grid;grid-template-columns:repeat(5,minmax(0,44px));grid-auto-rows:minmax(0,44px);gap:3px;background:var(--board);padding:6px;border-radius:6px}
-.cell{position:relative;background:var(--sq);border:1px solid var(--sq-line);border-radius:4px;
+#grid{display:grid;grid-template-columns:repeat(5,var(--cell));grid-auto-rows:var(--cell);gap:4px;background:var(--board);padding:8px;border-radius:6px}
+.cell{position:relative;width:var(--cell);height:var(--cell);background:var(--sq);border:1px solid var(--sq-line);border-radius:4px;
   display:flex;align-items:center;justify-content:center;cursor:default}
 .cell.throne{background:var(--sq)}
 .cell.throne.active-turn{border-color:var(--accent)}
@@ -34,14 +39,20 @@ h1{font-size:1.15rem;font-weight:700;margin:0;letter-spacing:.2px;text-align:lef
 .cell.attackable{box-shadow:inset 0 0 0 2px var(--atk);cursor:pointer}
 .cell.selected{box-shadow:inset 0 0 0 2px var(--accent)}
 .cell.active-turn{box-shadow:0 0 0 3px var(--accent), 0 0 10px 1px var(--accent)}
-.piece{width:38px;height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.piece{width:calc(var(--cell) * 0.84);height:calc(var(--cell) * 0.84);display:flex;flex-direction:column;align-items:center;justify-content:center;
   font-size:.6rem;font-weight:700;line-height:1;cursor:pointer;user-select:none;
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
   -webkit-mask-size:contain;mask-size:contain}
 .piece.P1{background:var(--p1);color:var(--p1-ink)}
 .piece.P2{background:var(--p2);color:var(--p2-ink)}
-.piece .hp{font-size:.95rem;font-weight:700;opacity:.95}
-.piece.king{width:42px;height:42px;cursor:default}
+.piece .hp{font-size:calc(var(--cell) * 0.26);font-weight:700;opacity:.95}
+.piece.king{width:calc(var(--cell) * 0.92);height:calc(var(--cell) * 0.92);cursor:default}
+#mobileBlock{display:none;min-height:100vh;align-items:center;justify-content:center;text-align:center;
+  padding:40px;font-size:1.05rem;color:var(--muted);line-height:1.6}
+@media (max-width:900px){
+  #layout{display:none}
+  #mobileBlock{display:flex}
+}
 #controls{display:flex; flex-direction:column; align-items:stretch; gap:8px}
 button{background:var(--accent);color:#241c08;border:none;border-radius:6px;padding:9px 16px;font-size:.9rem;font-weight:700;cursor:pointer}
 button:disabled{opacity:.4;cursor:not-allowed}
@@ -127,6 +138,10 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
       <button id="compareBtn">Compare all move patterns</button>
     </div>
   </div>
+</div>
+
+<div id="mobileBlock">
+  <div>Not optimized for mobile.<br>To play Dice Tactics, please use a computer.</div>
 </div>
 
 <script>
