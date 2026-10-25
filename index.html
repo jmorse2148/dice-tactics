@@ -405,8 +405,9 @@ function selectPiece(p){
 function doMove(row,col,steps){
   if(gameOver) return;
   selected.row=row; selected.col=col; movesLeft-=steps; actedThisTurn=true;
-  if(movesLeft<=0 && attacksLeft<=0) endTurn();
-  else render();
+  // turn never auto-ends, even once the piece has nothing left to do —
+  // the player always clicks End Turn explicitly
+  render();
 }
 
 function doAttack(target){
@@ -422,8 +423,9 @@ function doAttack(target){
     if(target.king) gameOver = turn;
     spawnDeathGhost(target);
   }
-  if(!gameOver && attacksLeft<=0 && movesLeft<=0) endTurn();
-  else render();
+  // turn never auto-ends — the player always clicks End Turn explicitly,
+  // same as after a move that leaves nothing left to do
+  render();
 }
 
 function endTurn(){
