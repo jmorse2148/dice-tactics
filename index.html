@@ -7,10 +7,12 @@
 <style>
 :root{
   --bg:#1c211f; --board:#2a3530; --sq:#33403a; --sq-line:#44544c;
-  --ink:#eae6da; --muted:#9aa89f; --p1:#e8ddc3; --p1-ink:#2a2416;
+  --ink:#eae6da; --muted:#9aa89f; --p1:#6b4a7d; --p1-ink:#f4ece6;
   --p2:#4d6a63; --p2-ink:#eae6da; --throne:#b68a3e; --throne-ink:#241c08;
   --move:#5fb3a3; --atk:#c0564a; --accent:#d9a441;
-  --cell: clamp(52px, 7.4vh, 88px);
+  /* reserves ~380px for the sidebar + paddings/gaps around the board so the
+     width term never overflows a narrower window, not just a shorter one */
+  --cell: clamp(40px, min(7.4vh, calc((100vw - 380px) / 5)), 88px);
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -22,6 +24,7 @@ body{display:flex;min-height:100vh}
    below the breakpoint we swap to a "use a computer" message instead. */
 #layout{display:flex;width:100%;min-height:100vh}
 #boardCol{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:32px;gap:16px}
+#boardCol.compareMode{justify-content:flex-start;max-height:100vh;overflow-y:auto}
 #sideCol{flex:none;width:220px;display:flex;flex-direction:column;justify-content:space-between;
   padding:32px 32px 32px 26px;border-left:1px solid var(--sq-line)}
 #sideTop{display:flex;flex-direction:column;gap:14px}
@@ -34,22 +37,33 @@ h1{font-size:1.15rem;font-weight:700;margin:0;letter-spacing:.2px;text-align:lef
 .cell{position:relative;width:var(--cell);height:var(--cell);background:var(--sq);border:1px solid var(--sq-line);border-radius:4px;
   display:flex;align-items:center;justify-content:center;cursor:default}
 .cell.throne{background:var(--sq)}
-.cell.throne.active-turn{border-color:var(--accent)}
 .cell.movable{box-shadow:inset 0 0 0 2px var(--move);cursor:pointer}
 .cell.attackable{box-shadow:inset 0 0 0 2px var(--atk);cursor:pointer}
-.cell.selected{box-shadow:inset 0 0 0 2px var(--accent)}
-.cell.active-turn{box-shadow:0 0 0 3px var(--accent), 0 0 10px 1px var(--accent)}
-.piece{width:calc(var(--cell) * 0.84);height:calc(var(--cell) * 0.84);display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-size:.6rem;font-weight:700;line-height:1;cursor:pointer;user-select:none;
-  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
-  -webkit-mask-size:contain;mask-size:contain}
-.piece.P1{background:var(--p1);color:var(--p1-ink)}
-.piece.P2{background:var(--p2);color:var(--p2-ink)}
-.piece .hp{font-size:calc(var(--cell) * 0.26);font-weight:700;opacity:.95}
+.piece{position:relative;width:calc(var(--cell) * 0.84);height:calc(var(--cell) * 0.84);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:.6rem;font-weight:700;line-height:1;cursor:pointer;user-select:none}
+.piece.P1{color:var(--p1-ink)}
+.piece.P2{color:var(--p2-ink)}
+.piece .hp{position:relative;z-index:1;font-size:calc(var(--cell) * 0.26);font-weight:700;opacity:.95}
 .piece.king{width:calc(var(--cell) * 0.92);height:calc(var(--cell) * 0.92);cursor:default}
+/* Pieces are real inline <svg><path> elements now (DIE_SHAPE path data,
+   injected by applyDieShape), so the die's own fill color and a genuine
+   stroke on the path can both be set directly — no mask/filter workaround
+   needed. The svg sits absolutely positioned behind the HP label so the
+   label can overlay it. "turn" = a thin ring on every piece belonging to
+   the player whose turn it is; "selected" is a thicker version on just the
+   one piece currently selected (replacing the turn ring, not stacking on
+   top of it). */
+.dieSvg{width:100%;height:100%;display:block;overflow:visible}
+.dieSvg path{stroke:none;vector-effect:non-scaling-stroke}
+.piece .dieSvg{position:absolute;inset:0}
+.P1 .dieSvg path{fill:var(--p1)}
+.P2 .dieSvg path{fill:var(--p2)}
+.piece.turn .dieSvg path{stroke:var(--accent);stroke-width:calc(var(--cell) * 0.035)}
+.piece.selected .dieSvg path{stroke:var(--accent);stroke-width:calc(var(--cell) * 0.06)}
+.piece.selected .dieSvg{filter:drop-shadow(0 0 6px var(--accent)) drop-shadow(0 0 2px var(--accent))}
 #mobileBlock{display:none;min-height:100vh;align-items:center;justify-content:center;text-align:center;
   padding:40px;font-size:1.05rem;color:var(--muted);line-height:1.6}
-@media (max-width:900px){
+@media (max-width:480px){
   #layout{display:none}
   #mobileBlock{display:flex}
 }
@@ -69,11 +83,11 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 
 .selPanel{display:flex;flex-direction:column;gap:12px;margin-top:10px}
 .selHeader{display:flex;align-items:center;gap:10px}
-.selSwatch{width:30px;height:30px;flex:none;
-  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
-  -webkit-mask-size:contain;mask-size:contain}
-.selSwatch.P1{background:var(--p1)}
-.selSwatch.P2{background:var(--p2)}
+.selSwatch{position:relative;width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center}
+.selSwatch .dieSvg{position:absolute;inset:0}
+.selSwatch .hp{position:relative;z-index:1;font-size:.62rem;font-weight:800}
+.selSwatch.P1 .hp{color:var(--p1-ink)}
+.selSwatch.P2 .hp{color:var(--p2-ink)}
 
 .iconRow .rowLabel{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
 .iconRow .icons{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
@@ -88,7 +102,7 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 .pip.locked::after{content:'';position:absolute;left:0;right:0;top:50%;height:1.5px;background:var(--atk);transform:translateY(-50%) rotate(45deg)}
 
 .floatNum{position:absolute;left:50%;top:6%;transform:translateX(-50%);font-weight:800;font-size:.85rem;
-  color:#ffdfd9;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;animation:floatUp .9s ease-out forwards;z-index:5}
+  color:#ff5349;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;animation:floatUp .9s ease-out forwards;z-index:5}
 @keyframes floatUp{
   0%{opacity:0;transform:translate(-50%,0) scale(.8)}
   15%{opacity:1;transform:translate(-50%,-6px) scale(1.05)}
@@ -103,7 +117,10 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 #compareView{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:820px}
 .mini{display:flex;flex-direction:column;align-items:center;gap:6px}
 .mini h3{margin:0;font-size:.85rem}
-.mini p{margin:0;font-size:.7rem;color:var(--muted)}
+.miniStats{display:flex;flex-direction:row;align-items:flex-start;justify-content:center;gap:18px}
+.miniStats .rowLabel{text-align:center}
+.miniStats .icons{justify-content:center}
+.miniDmgVal{font-size:.95rem;font-weight:800;color:var(--atk);line-height:16px;text-align:center}
 .miniGrid{display:grid;grid-template-columns:repeat(13,minmax(0,14px));grid-auto-rows:minmax(0,14px);gap:2px;background:var(--board);padding:4px;border-radius:4px}
 .miniCell{background:var(--sq);border:1px solid var(--sq-line);border-radius:2px}
 .miniCell.reach{background:var(--move)}
@@ -111,7 +128,7 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 @media (prefers-color-scheme: light){
   :root:not([data-theme="dark"]){
     --bg:#f4f1ea;--board:#dcd6c6;--sq:#eceadf;--sq-line:#c9c2ab;--ink:#2a2d27;--muted:#6b6f64;
-    --p1:#fff6e0;--p1-ink:#2a2416;--p2:#3c5950;--p2-ink:#f4f1ea;--throne:#c99b3f;--throne-ink:#241c08;
+    --p1:#5c3f6e;--p1-ink:#f7f1ea;--p2:#3c5950;--p2-ink:#f4f1ea;--throne:#c99b3f;--throne-ink:#241c08;
     color-scheme: light;
   }
 }
@@ -135,7 +152,7 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
     <div id="controls">
       <button id="endTurnBtn">End turn</button>
       <button id="resetBtn" class="secondary">Reset</button>
-      <button id="compareBtn">Compare all move patterns</button>
+      <button id="compareBtn">See all move patterns</button>
     </div>
   </div>
 </div>
@@ -173,15 +190,20 @@ const DIE_LABEL_OFFSET = { d4: 3.5, d12: 2 };
 function applyDieShape(el, type){
   const s = DIE_SHAPE[type];
   if(!s) return;
-  const uri = 'url("data:image/svg+xml,' + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${s.vb}"><path d="${s.d}" fill="black"/></svg>`
-  ) + '")';
-  el.style.webkitMaskImage = uri;
-  el.style.maskImage = uri;
-  const scale = DIE_VISUAL_SCALE[type];
-  const size = scale ? (scale*100)+'%' : 'contain';
-  el.style.webkitMaskSize = size;
-  el.style.maskSize = size;
+  // d6 reads visually larger than the other silhouettes in the same
+  // bounding box, so its viewBox gets padded out symmetrically (rather
+  // than scaling the svg element itself) to shrink it in place while
+  // staying centered on the same spot.
+  const scale = DIE_VISUAL_SCALE[type] || 1;
+  let vb = s.vb;
+  if(scale !== 1){
+    const [x,y,w,h] = s.vb.split(' ').map(Number);
+    const nw = w/scale, nh = h/scale;
+    vb = `${x-(nw-w)/2} ${y-(nh-h)/2} ${nw} ${nh}`;
+  }
+  el.insertAdjacentHTML('afterbegin',
+    `<svg class="dieSvg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet"><path d="${s.d}"/></svg>`
+  );
   const offset = DIE_LABEL_OFFSET[type];
   const hp = el.querySelector('.hp');
   if(hp && offset) hp.style.transform = `translateY(${offset}px)`;
@@ -218,7 +240,7 @@ function makePip(cls){
 }
 
 function spawnFloater(row, col, text){
-  const f = { row, col, text };
+  const f = { row, col, text, t: Date.now() };
   floaters.push(f);
   setTimeout(() => { floaters = floaters.filter(x => x !== f); render(); }, 900);
 }
@@ -367,9 +389,35 @@ function renderCompare(){
     const wrap=document.createElement('div');
     wrap.className='mini';
     const h=document.createElement('h3'); h.textContent=type.toUpperCase();
-    const p=document.createElement('p');
     const d=DICE[type];
-    p.textContent=`${d.dirs} \u00b7 ${d.move}sq \u00b7 ${d.attacks} atk`;
+
+    // Same sword/pip icons as the sidebar's live move/attack budget \u2014 here
+    // every icon just reads as "available" since this screen shows each
+    // die's full traits, not an in-progress turn. The direction/range words
+    // (omni, diag, etc.) are dropped since the grid below already shows it.
+    const statWrap=document.createElement('div'); statWrap.className='miniStats';
+    const atkWrap=document.createElement('div'); atkWrap.className='iconRow';
+    const atkLabel=document.createElement('div'); atkLabel.className='rowLabel'; atkLabel.textContent='Attacks';
+    const atkIcons=document.createElement('div'); atkIcons.className='icons';
+    for(let i=0;i<d.attacks;i++) atkIcons.appendChild(makeSwordIcon('avail'));
+    atkWrap.appendChild(atkLabel); atkWrap.appendChild(atkIcons);
+    statWrap.appendChild(atkWrap);
+
+    const mvWrap=document.createElement('div'); mvWrap.className='iconRow';
+    const mvLabel=document.createElement('div'); mvLabel.className='rowLabel'; mvLabel.textContent='Moves';
+    const mvIcons=document.createElement('div'); mvIcons.className='icons';
+    for(let i=0;i<d.move;i++) mvIcons.appendChild(makePip('avail'));
+    mvWrap.appendChild(mvLabel); mvWrap.appendChild(mvIcons);
+    statWrap.appendChild(mvWrap);
+
+    // Best case for a full turn: every attack this die gets, each landing
+    // its highest possible roll (the die's own max face value).
+    const dmgWrap=document.createElement('div'); dmgWrap.className='iconRow';
+    const dmgLabel=document.createElement('div'); dmgLabel.className='rowLabel'; dmgLabel.textContent='Max dmg';
+    const dmgVal=document.createElement('div'); dmgVal.className='miniDmgVal'; dmgVal.textContent=d.attacks*d.sides;
+    dmgWrap.appendChild(dmgLabel); dmgWrap.appendChild(dmgVal);
+    statWrap.appendChild(dmgWrap);
+
     const g=document.createElement('div'); g.className='miniGrid';
     for(let r=PATTERN_RADIUS;r>=-PATTERN_RADIUS;r--){
       for(let c=-PATTERN_RADIUS;c<=PATTERN_RADIUS;c++){
@@ -380,7 +428,7 @@ function renderCompare(){
         g.appendChild(cell);
       }
     }
-    wrap.appendChild(h); wrap.appendChild(p); wrap.appendChild(g);
+    wrap.appendChild(h); wrap.appendChild(statWrap); wrap.appendChild(g);
     el.appendChild(wrap);
   });
 }
@@ -390,7 +438,12 @@ function toggleCompare(){
   compareOpen=!compareOpen;
   document.getElementById('boardWrap').style.display = compareOpen?'none':'flex';
   document.getElementById('compareView').style.display = compareOpen?'flex':'none';
-  document.getElementById('compareBtn').textContent = compareOpen?'Back to board':'Compare all move patterns';
+  // the board column normally centers its content vertically, which is fine
+  // for the fixed-size board but clips the taller compare grid on shorter
+  // viewports (half pushed above the top edge, unreachable by scrolling) —
+  // so in compare mode it instead top-aligns and scrolls internally
+  document.getElementById('boardCol').classList.toggle('compareMode', compareOpen);
+  document.getElementById('compareBtn').textContent = compareOpen?'Back to board':'See all move patterns';
   if(compareOpen) renderCompare();
 }
 
@@ -399,6 +452,18 @@ function selectPiece(p){
   if(actedThisTurn && p!==selected) return;
   if(p===selected) return; // already the active piece this turn — don't reset its remaining budget
   selected=p; movesLeft=DICE[p.type].move; attacksLeft=DICE[p.type].attacks; moveLocked=false;
+  render();
+}
+
+// Clicking anywhere that isn't an in-progress action (a piece, a movable/
+// attackable square, a button) clears the current selection and goes back
+// to the pre-selection state — but only before the piece has actually moved
+// or attacked. Once it's acted, the selection is locked in for the rest of
+// the turn (same rule selectPiece already enforces), so there's nothing to
+// revert to.
+function deselectPiece(){
+  if(gameOver || !selected || actedThisTurn) return;
+  selected=null; movesLeft=0; attacksLeft=0; moveLocked=false;
   render();
 }
 
@@ -418,7 +483,7 @@ function doAttack(target){
   const dmg = 1+Math.floor(Math.random()*DICE[selected.type].sides);
   target.hp -= dmg;
   attacksLeft--;
-  spawnFloater(target.row, target.col, String(dmg));
+  spawnFloater(target.row, target.col, '-'+dmg);
   if(target.hp<=0){
     if(target.king) gameOver = turn;
     spawnDeathGhost(target);
@@ -442,6 +507,14 @@ function addFloaters(cellDiv, row, col){
     const fd = document.createElement('div');
     fd.className = 'floatNum';
     fd.textContent = f.text;
+    // A kill triggers a second render() mid-flight (the death ghost's own
+    // fade-out removal at 600ms), which recreates this element from
+    // scratch — a fresh element restarts a CSS animation from 0%, which
+    // looked like the damage number playing twice. Starting the animation
+    // at a negative delay equal to how long it's actually been alive makes
+    // a re-created element pick up exactly where the old one left off
+    // instead of restarting.
+    fd.style.animationDelay = `-${Date.now() - f.t}ms`;
     cellDiv.appendChild(fd);
   });
 }
@@ -479,12 +552,17 @@ function render(){
     const p = pieceAt(row,col);
     if(p){
       const destroyed = p.hp<=0;
-      if(p===selected) cell.classList.add('selected');
       const isTarget = targets.includes(p);
       if(isTarget) cell.classList.add('attackable');
-      if(isThrone && p.king && p.player===turn && !gameOver && !destroyed) cell.classList.add('active-turn');
+      // the selected piece gets its own stronger, glowing ring; while nothing
+      // is selected yet, every piece belonging to the player whose turn it is
+      // gets the lighter turn ring instead — but once a piece IS selected,
+      // every other piece's ring goes away so the selected one reads clearly
+      // (never both at once, and never on a destroyed piece)
+      const isSelected = p===selected;
+      const ringCls = destroyed ? '' : isSelected ? ' selected' : (!selected && p.player===turn && !gameOver ? ' turn' : '');
       const pdiv=document.createElement('div');
-      pdiv.className='piece '+p.player+(p.king?' king':'')+(isTarget?' target':'')+(destroyed?' destroyed':'');
+      pdiv.className='piece '+p.player+(p.king?' king':'')+(isTarget?' target':'')+(destroyed?' destroyed':'')+ringCls;
       pdiv.innerHTML=`<div class="hp">${Math.max(0,p.hp)}</div>`;
       applyDieShape(pdiv,p.type);
       if(isTarget){ pdiv.onclick=(e)=>{ e.stopPropagation(); doAttack(p); }; }
@@ -508,7 +586,24 @@ function render(){
   }
 
   renderSidebar();
-  document.getElementById('endTurnBtn').disabled = !!gameOver;
+  // End Turn reads as the "confirm" action (solid/filled) once the selected
+  // piece has committed to something this turn (moved or attacked) and has
+  // no LEGAL action left afterward — not just leftover budget numbers. A
+  // piece can have movesLeft/attacksLeft > 0 and still be stuck: boxed in
+  // with nowhere to move (moves.length===0), or with an attack left but no
+  // enemy adjacent to use it on (targets.length===0). Reusing the same
+  // `moves`/`targets` arrays the board highlighting already computed above
+  // keeps this in sync with what's actually clickable.
+  //
+  // The actedThisTurn gate matters for a piece that's simply boxed in from
+  // the moment it's selected (the king at a blocked throne, a pawn with no
+  // open squares or neighbors) — nothing's been committed yet, so the
+  // player can still deselect and try a different piece instead. The button
+  // only turns yellow once there's truly nothing left to do this turn.
+  const exhausted = !!selected && !gameOver && actedThisTurn && moves.length===0 && targets.length===0;
+  const etBtn = document.getElementById('endTurnBtn');
+  etBtn.disabled = !!gameOver;
+  etBtn.classList.toggle('secondary', !exhausted);
 }
 
 function renderSidebar(){
@@ -533,6 +628,7 @@ function renderSidebar(){
     header.className='selHeader';
     const swatch=document.createElement('div');
     swatch.className='selSwatch '+selected.player;
+    swatch.innerHTML=`<div class="hp">${DICE[selected.type].sides}</div>`;
     applyDieShape(swatch, selected.type);
     header.appendChild(swatch);
     panel.appendChild(header);
@@ -567,6 +663,11 @@ function renderSidebar(){
 document.getElementById('endTurnBtn').onclick=()=>{ if(!gameOver) endTurn(); };
 document.getElementById('resetBtn').onclick=reset;
 document.getElementById('compareBtn').onclick=toggleCompare;
+// click-away to deselect: any click that wasn't already handled (and didn't
+// stopPropagation) bubbles up to here — a piece, movable square or button
+// click stops here via stopPropagation/doesn't apply, so this only fires for
+// clicks on empty board squares, the sidebar background, etc.
+document.addEventListener('click', deselectPiece);
 reset();
 </script>
 </body>
