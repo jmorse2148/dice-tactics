@@ -149,6 +149,37 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 .modalClose{position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.4rem;
   line-height:1;cursor:pointer;color:var(--muted);padding:4px}
 .modalClose:hover{color:var(--ink)}
+.lobbyOverlay{z-index:60}
+#resultBanner{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;z-index:50;text-align:center}
+#resultBanner.show{display:flex}
+#resultBanner .resWord{font-weight:900;font-size:clamp(3.5rem,16vw,10rem);letter-spacing:.06em;line-height:1;
+  -webkit-text-stroke:2px rgba(0,0,0,.35);paint-order:stroke fill;
+  text-shadow:0 6px 0 rgba(0,0,0,.35),0 0 60px currentColor;
+  animation:resPop .6s cubic-bezier(.2,1.4,.4,1) both,resFloat 3.2s ease-in-out .6s infinite}
+#resultBanner .resSub{margin-top:14px;font-size:1rem;letter-spacing:.2em;text-transform:uppercase;color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,.7);animation:resPop .6s .15s both}
+#resultBanner.victory .resWord{color:#f5c542}
+#resultBanner.defeat .resWord{color:#e0453a}
+@keyframes resPop{0%{opacity:0;transform:scale(.3)}100%{opacity:1;transform:scale(1)}}
+@keyframes resFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.lobbyCard,.netCard{max-width:420px}
+.lobbyCard>h2{text-align:center;font-size:2rem;line-height:1.1;margin:4px 0 22px;letter-spacing:.01em}
+.lobbyCard .textLink{align-self:center;background:none;border:0;padding:4px 6px;margin-top:4px;
+  color:var(--muted);font:inherit;font-size:.8rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.lobbyCard .textLink:hover{color:var(--ink)}
+#lobbyMenu{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.lobbyJoin,.linkRow{display:flex;gap:8px}
+.lobbyCard input{flex:1;min-width:0;background:var(--sq);color:var(--ink);border:1px solid var(--sq-line);
+  border-radius:6px;padding:9px 12px;font:inherit;font-size:.9rem}
+#joinInput{text-transform:uppercase;letter-spacing:.25em;font-weight:700}
+.roomCode{font-size:2rem;font-weight:800;letter-spacing:.3em;text-align:center;color:var(--accent);margin:10px 0 14px;padding-left:.3em}
+.lobbyHint{color:var(--muted)!important;margin-top:12px!important}
+.lobbyErr{color:var(--atk)!important;min-height:1.2em;margin-top:10px!important}
+.netBtns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:9px 16px;border-radius:999px;font-size:.8rem;font-weight:600;z-index:80;display:none}
+#netNote{font-size:.78rem;color:var(--muted);min-height:1em}
 @media (prefers-color-scheme: light){
   :root:not([data-theme="dark"]){
     --bg:#f4f1ea;--board:#dcd6c6;--sq:#eceadf;--sq-line:#c9c2ab;--ink:#2a2d27;--muted:#6b6f64;
@@ -196,6 +227,39 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
     <div id="devlogEntries"></div>
   </div>
 </div>
+<div id="lobbyModal" class="modalOverlay lobbyOverlay" style="display:none">
+  <div class="modalCard lobbyCard">
+    <h2>Dice Tactics</h2>
+    <div id="lobbyMenu">
+      <button id="createBtn">Create online game</button>
+      <div class="lobbyJoin">
+        <input id="joinInput" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false">
+        <button id="joinBtn" class="secondary">Join</button>
+      </div>
+      <button id="localBtn" class="textLink" type="button">play against myself</button>
+    </div>
+    <div id="lobbyWait" style="display:none">
+      <h3>Waiting for your opponent</h3>
+      <p>Send them this link, or have them enter the code:</p>
+      <div class="roomCode" id="roomCodeText"></div>
+      <div class="linkRow">
+        <input id="roomLink" readonly>
+        <button id="copyBtn" class="secondary">Copy link</button>
+      </div>
+      <p class="lobbyHint">The game starts as soon as they join. You'll play as P1.</p>
+    </div>
+    <p id="lobbyErr" class="lobbyErr"></p>
+  </div>
+</div>
+<div id="netModal" class="modalOverlay lobbyOverlay" style="display:none">
+  <div class="modalCard netCard">
+    <h2 id="netTitle"></h2>
+    <p id="netText"></p>
+    <div id="netBtns" class="netBtns"></div>
+  </div>
+</div>
+<div id="resultBanner" aria-live="polite"><div class="resWord"></div><div class="resSub"></div></div>
+<div id="toast"></div>
 <div id="layout">
   <div id="boardCol">
     <div id="boardWrap">
@@ -209,6 +273,7 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
     <div id="sideTop">
       <h1>Dice Tactics — Core Loop Prototype</h1>
       <div id="status"></div>
+      <div id="netNote"></div>
     </div>
     <div id="controls">
       <button id="endTurnBtn">End turn</button>
@@ -227,6 +292,7 @@ button.secondary{background:transparent;color:var(--ink);border:1px solid var(--
 // goes live on GitHub Pages, not whenever it was written here in the
 // prototype — update it at push time.
 const DEVLOG = [
+  { date: 'October 25, 2026', time: '5:09 PM', text: "Alpha testing multiplayer." },
   { date: 'October 25, 2026', time: '2:56 PM', text: "Alpha build for initial testing. Currently balancing dice movements and abilities. You currently play as both players, but real multiplayer will be supported shortly." }
 ];
 
@@ -283,6 +349,12 @@ const OMNI=[...DIAG,...ORTHO];
 const dirsFor = d => d.dirs==='diag'?DIAG : d.dirs==='ortho'?ORTHO : OMNI;
 
 let pieces, turn, selected, movesLeft, attacksLeft, gameOver, actedThisTurn, moveLocked;
+// online play: when `online` is false everything behaves as the local
+// two-sides-on-one-screen game. When true, only committed results (pieces,
+// whose turn, game over) are shared through the room; selection and the
+// per-turn move/attack budget stay local to the player taking the turn.
+let online=false, myRole=null, roomCode=null, net=null, lastSeq=0, pendingReset=false;
+const isMine = pl => !online || pl===myRole;
 let floaters = [];     // transient floating damage numbers: {row,col,text,until}
 let dyingGhosts = [];  // transient fade-out silhouettes for just-destroyed pieces
 
@@ -516,7 +588,7 @@ function toggleCompare(){
 }
 
 function selectPiece(p){
-  if(gameOver || p.player!==turn || p.hp<=0) return;
+  if(gameOver || p.player!==turn || !isMine(p.player) || p.hp<=0) return;
   if(actedThisTurn && p!==selected) return;
   if(p===selected) return; // already the active piece this turn — don't reset its remaining budget
   selected=p; movesLeft=DICE[p.type].move; attacksLeft=DICE[p.type].attacks; moveLocked=false;
@@ -540,6 +612,7 @@ function doMove(row,col,steps){
   selected.row=row; selected.col=col; movesLeft-=steps; actedThisTurn=true;
   // turn never auto-ends, even once the piece has nothing left to do —
   // the player always clicks End Turn explicitly
+  publishGame(null);
   render();
 }
 
@@ -552,10 +625,16 @@ function doAttack(target){
   target.hp -= dmg;
   attacksLeft--;
   spawnFloater(target.row, target.col, '-'+dmg);
-  if(target.hp<=0){
+  const killed = target.hp<=0;
+  if(killed){
     if(target.king) gameOver = turn;
     spawnDeathGhost(target);
   }
+  // the opponent's screen replays the same floating number / death fade
+  publishGame({
+    floater:{row:target.row, col:target.col, text:'-'+dmg},
+    ghost: killed ? {type:target.type, player:target.player, row:target.row, col:target.col} : null
+  });
   // turn never auto-ends — the player always clicks End Turn explicitly,
   // same as after a move that leaves nothing left to do
   render();
@@ -565,6 +644,7 @@ function endTurn(){
   pieces = pieces.filter(p=>p.hp>0);
   selected=null; movesLeft=0; attacksLeft=0; actedThisTurn=false; moveLocked=false;
   turn = turn==='P1' ? 'P2' : 'P1';
+  publishGame(null);
   render();
 }
 
@@ -628,13 +708,13 @@ function render(){
       // every other piece's ring goes away so the selected one reads clearly
       // (never both at once, and never on a destroyed piece)
       const isSelected = p===selected;
-      const ringCls = destroyed ? '' : isSelected ? ' selected' : (!selected && p.player===turn && !gameOver ? ' turn' : '');
+      const ringCls = destroyed ? '' : isSelected ? ' selected' : (!selected && p.player===turn && isMine(p.player) && !gameOver ? ' turn' : '');
       const pdiv=document.createElement('div');
       pdiv.className='piece '+p.player+(p.king?' king':'')+(isTarget?' target':'')+(destroyed?' destroyed':'')+ringCls;
       pdiv.innerHTML=`<div class="hp">${Math.max(0,p.hp)}</div>`;
       applyDieShape(pdiv,p.type);
       if(isTarget){ pdiv.onclick=(e)=>{ e.stopPropagation(); doAttack(p); }; }
-      else if(!destroyed && p.player===turn && !gameOver){ pdiv.onclick=(e)=>{ e.stopPropagation(); selectPiece(p); }; }
+      else if(!destroyed && p.player===turn && isMine(p.player) && !gameOver){ pdiv.onclick=(e)=>{ e.stopPropagation(); selectPiece(p); }; }
       cell.appendChild(pdiv);
     } else {
       addGhost(cell, row, col);
@@ -643,12 +723,18 @@ function render(){
     return cell;
   }
 
-  // P2 throne on top (row9), P1 throne on bottom (row1 side)
-  top.appendChild(buildCellDiv(9,2,true));
-  bottom.appendChild(buildCellDiv(0,2,true));
+  // P2 throne on top (row9), P1 throne on bottom (row1 side). Playing
+  // online as P2, the whole board is turned 180 degrees so your own side is
+  // always at the bottom of YOUR screen (a rotation, not a mirror, so every
+  // move pattern is unchanged).
+  const flip = online && myRole==='P2';
+  top.appendChild(buildCellDiv(flip?0:9,2,true));
+  bottom.appendChild(buildCellDiv(flip?9:0,2,true));
 
-  for(let r=8;r>=1;r--){
-    for(let c=0;c<5;c++){
+  for(let i=0;i<8;i++){
+    const r = flip ? i+1 : 8-i;
+    for(let j=0;j<5;j++){
+      const c = flip ? 4-j : j;
       grid.appendChild(buildCellDiv(r,c,false));
     }
   }
@@ -670,10 +756,29 @@ function render(){
   // only turns yellow once there's truly nothing left to do this turn.
   const exhausted = !!selected && !gameOver && actedThisTurn && moves.length===0 && targets.length===0;
   const etBtn = document.getElementById('endTurnBtn');
-  etBtn.disabled = !!gameOver;
+  etBtn.disabled = !!gameOver || (online && turn!==myRole);
   etBtn.classList.toggle('secondary', !exhausted);
+  // after a win the Reset button becomes the (primary) Play again button
+  const rsBtn = document.getElementById('resetBtn');
+  rsBtn.textContent = gameOver ? 'Play again' : 'Reset';
+  rsBtn.classList.toggle('secondary', !gameOver);
+  updateResultBanner();
+  updateNetNote();
 }
 
+let _resShown=null;
+function updateResultBanner(){
+  const el=document.getElementById('resultBanner');
+  const key = gameOver ? (online ? (gameOver===myRole?'victory':'defeat') : 'victory') : null;
+  if(key===_resShown) return;
+  _resShown=key;
+  el.classList.remove('show','victory','defeat');
+  if(!key) return;
+  el.querySelector('.resWord').textContent = key==='victory' ? 'VICTORY' : 'DEFEAT';
+  el.querySelector('.resSub').textContent = online ? '' : gameOver+' wins';
+  void el.offsetWidth;
+  el.classList.add('show',key);
+}
 function renderSidebar(){
   const statusEl=document.getElementById('status');
   statusEl.innerHTML='';
@@ -685,6 +790,7 @@ function renderSidebar(){
   turnRow.appendChild(dot);
   const label=document.createElement('span');
   label.innerHTML = gameOver ? `<b>${gameOver} wins</b>` : `<b>${turn}</b>'s turn`;
+  if(online) label.innerHTML += ` <span class="youTag">· you're ${myRole}</span>`;
   turnRow.appendChild(label);
   statusEl.appendChild(turnRow);
 
@@ -728,8 +834,224 @@ function renderSidebar(){
   }
 }
 
+// ===== Online play =====
+// Only committed results go through the shared room (pieces, whose turn,
+// game over, plus a one-shot "event" so the other screen replays the damage
+// number / death fade). Selection and the in-turn move/attack budget stay
+// local to whoever is taking the turn. Room layout in the database:
+//   rooms/CODE/players  {P1: clientId, P2: clientId}
+//   rooms/CODE/game     {pieces, turn, gameOver, seq, writer, event}
+//   rooms/CODE/request  {by, id, status?}   restart request / answer
+//   rooms/CODE/left     role of whoever disconnected (ends the game)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAOVOQpvEEVBtUi8RWxLXL_ZZkKC74S9Ys",
+  authDomain: "dice-tactics-5cfec.firebaseapp.com",
+  databaseURL: "https://dice-tactics-5cfec-default-rtdb.firebaseio.com",
+  projectId: "dice-tactics-5cfec",
+  storageBucket: "dice-tactics-5cfec.firebasestorage.app",
+  messagingSenderId: "443300832048",
+  appId: "1:443300832048:web:bdaf55ea01b9a54de29ef5"
+};
+const FB_VERSION = '13.1.0';
+
+// per-tab id (sessionStorage) so two tabs on one computer count as two players
+let clientId = null;
+try{ clientId = sessionStorage.getItem('dt_client'); }catch(e){}
+if(!clientId){
+  clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  try{ sessionStorage.setItem('dt_client', clientId); }catch(e){}
+}
+
+async function getNet(){
+  if(window.__NET_TEST__) return window.__NET_TEST__;
+  const base = 'https://www.gstatic.com/firebasejs/' + FB_VERSION + '/';
+  const [appM, dbM] = await Promise.all([import(base+'firebase-app.js'), import(base+'firebase-database.js')]);
+  const db = dbM.getDatabase(appM.initializeApp(FIREBASE_CONFIG));
+  const R = p => dbM.ref(db, p);
+  return {
+    get: async p => (await dbM.get(R(p))).val(),
+    set: (p,v) => dbM.set(R(p), v),
+    update: (p,v) => dbM.update(R(p), v),
+    listen: (p,cb) => dbM.onValue(R(p), s => cb(s.val())),
+    onDisconnectSet: (p,v) => dbM.onDisconnect(R(p)).set(v)
+  };
+}
+
+function snapshotGame(event){
+  return JSON.parse(JSON.stringify({
+    pieces: pieces.map(p=>({id:p.id, player:p.player, type:p.type, row:p.row, col:p.col, hp:p.hp, maxHp:p.maxHp, king:!!p.king})),
+    turn, gameOver: gameOver||null, seq: ++lastSeq, writer: clientId, event: event||null
+  }));
+}
+function publishGame(event, extra){
+  if(!online || !net) return;
+  net.update('rooms/'+roomCode, Object.assign({game: snapshotGame(event)}, extra||{}));
+}
+
+function applyRemoteGame(g){
+  lastSeq = Math.max(lastSeq, g.seq||0);
+  const arr = Array.isArray(g.pieces) ? g.pieces : Object.values(g.pieces||{});
+  pieces = arr.map(p=>{ const q={...p}; if(!q.king) delete q.king; return q; });
+  turn = g.turn; gameOver = g.gameOver || null;
+  selected=null; movesLeft=0; attacksLeft=0; actedThisTurn=false; moveLocked=false;
+  const ev = g.event;
+  if(ev && ev.kind==='reset'){ floaters=[]; dyingGhosts=[]; }
+  if(ev && ev.floater) spawnFloater(ev.floater.row, ev.floater.col, ev.floater.text);
+  if(ev && ev.ghost) spawnDeathGhost(ev.ghost);
+  render();
+}
+
+// ---- small UI helpers ----
+const $ = id => document.getElementById(id);
+let toastTimer=null;
+function showToast(msg){
+  const t=$('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.style.display='none'; }, 3500);
+}
+let netModalKind=null;
+function showNetModal(kind, title, text, buttons){
+  netModalKind=kind;
+  $('netTitle').textContent=title; $('netText').textContent=text;
+  const box=$('netBtns'); box.innerHTML='';
+  buttons.forEach(b=>{
+    const el=document.createElement('button'); el.textContent=b.label;
+    if(b.secondary) el.className='secondary';
+    el.onclick=b.onClick; box.appendChild(el);
+  });
+  $('netModal').style.display='flex';
+}
+function hideNetModal(){ netModalKind=null; $('netModal').style.display='none'; }
+function updateNetNote(){
+  const el=$('netNote'); if(!el) return;
+  el.textContent = !online ? '' :
+    pendingReset ? 'Waiting for your opponent to agree to a new game…' :
+    (!gameOver && turn!==myRole) ? "Waiting for your opponent's move…" : '';
+}
+function baseUrl(){ return location.href.split('#')[0].split('?')[0]; }
+
+// ---- lobby ----
+function lobbyError(msg){ $('lobbyErr').textContent = msg||''; }
+function showLobbyMenu(err){
+  $('lobbyModal').style.display='flex'; $('lobbyMenu').style.display='flex'; $('lobbyWait').style.display='none';
+  $('createBtn').disabled=false; $('joinBtn').disabled=false; lobbyError(err);
+}
+function showLobbyWait(){
+  $('lobbyModal').style.display='flex'; $('lobbyMenu').style.display='none'; $('lobbyWait').style.display='block';
+  $('roomCodeText').textContent=roomCode; $('roomLink').value=baseUrl()+'?room='+roomCode; lobbyError('');
+}
+function hideLobby(){ $('lobbyModal').style.display='none'; }
+
+function genCode(){
+  const A='ABCDEFGHJKLMNPQRSTUVWXYZ'; let s='';
+  for(let i=0;i<4;i++) s+=A[Math.floor(Math.random()*A.length)];
+  return s;
+}
+async function createRoom(){
+  net = await getNet();
+  let code, tries=0;
+  do{ code=genCode(); } while((await net.get('rooms/'+code)) && ++tries<10);
+  reset();                       // fresh board for the new game
+  lastSeq=0;
+  await net.set('rooms/'+code, {players:{P1:clientId}, game:snapshotGame(null), created:Date.now()});
+  enterRoom(code,'P1');
+}
+async function joinRoom(code){
+  net = await getNet();
+  const room = await net.get('rooms/'+code);
+  if(!room) throw new Error('No game found with that code.');
+  if(room.left) throw new Error('That game has already ended.');
+  const pl = room.players||{};
+  let role;
+  if(pl.P1===clientId) role='P1';
+  else if(pl.P2===clientId) role='P2';
+  else if(!pl.P2){ await net.set('rooms/'+code+'/players/P2', clientId); role='P2'; }
+  else throw new Error('That game already has two players.');
+  lastSeq=0;
+  enterRoom(code, role);
+}
+function enterRoom(code, role){
+  online=true; myRole=role; roomCode=code;
+  try{ history.replaceState(null,'','?room='+code); }catch(e){}
+  net.onDisconnectSet('rooms/'+code+'/left', role);
+  net.listen('rooms/'+code, onRoom);
+  render();
+}
+
+function onRoom(room){
+  if(!room) return;
+  if(room.left && room.left!==myRole){
+    showNetModal('ended','Game over','Your opponent left the game.',[{label:'Back to menu', onClick:()=>{ location.href=baseUrl(); }}]);
+    return;
+  }
+  const pl = room.players||{};
+  if(!pl.P2){ showLobbyWait(); return; }
+  if($('lobbyModal').style.display!=='none') hideLobby();
+  const g = room.game;
+  if(g){
+    if(g.writer===clientId) lastSeq=Math.max(lastSeq,g.seq||0);
+    else if((g.seq||0)>lastSeq) applyRemoteGame(g);
+  }
+  handleRequest(room.request);
+}
+
+// ---- restart requests (Reset / Play again need the other player's OK) ----
+function onResetClick(){
+  if(!online){ reset(); return; }
+  if(pendingReset){ showToast('Still waiting for your opponent to answer.'); return; }
+  pendingReset=true; updateNetNote();
+  net.set('rooms/'+roomCode+'/request', {by:myRole, id:Date.now()});
+}
+function handleRequest(rq){
+  if(!rq){
+    pendingReset=false;
+    if(netModalKind==='reset') hideNetModal();
+    updateNetNote(); return;
+  }
+  if(rq.by===myRole){
+    if(rq.status==='declined'){
+      pendingReset=false; showToast('Your opponent declined a new game.');
+      net.set('rooms/'+roomCode+'/request', null);
+    } else pendingReset=true;
+    updateNetNote(); return;
+  }
+  if(!rq.status){
+    showNetModal('reset','New game?', rq.by+' wants to start a new game. Everything on the board will reset.', [
+      {label:'Decline', secondary:true, onClick:()=>{
+        hideNetModal(); net.update('rooms/'+roomCode, {request:{by:rq.by, id:rq.id, status:'declined'}}); }},
+      {label:'Accept', onClick:()=>{
+        hideNetModal(); reset(); publishGame({kind:'reset'}, {request:null}); }}
+    ]);
+  }
+}
+
+function initNet(){
+  $('createBtn').onclick = async ()=>{
+    $('createBtn').disabled=true; lobbyError('Connecting…');
+    try{ await createRoom(); }
+    catch(e){ console.error(e); showLobbyMenu("Couldn't connect to the game server. You can still play locally."); }
+  };
+  const doJoin = async code=>{
+    code=(code||'').trim().toUpperCase();
+    if(code.length!==4){ lobbyError('Enter the 4-letter code.'); return; }
+    $('joinBtn').disabled=true; lobbyError('Connecting…');
+    try{ await joinRoom(code); }
+    catch(e){ console.error(e); showLobbyMenu(e && e.message && /game/.test(e.message) ? e.message : "Couldn't connect to the game server."); }
+  };
+  $('joinBtn').onclick = ()=>doJoin($('joinInput').value);
+  $('joinInput').onkeydown = e=>{ if(e.key==='Enter') doJoin($('joinInput').value); };
+  $('localBtn').onclick = ()=>{ online=false; hideLobby(); render(); };
+  $('copyBtn').onclick = ()=>{
+    const inp=$('roomLink'); inp.select();
+    try{ navigator.clipboard.writeText(inp.value); }catch(e){ document.execCommand('copy'); }
+    showToast('Link copied');
+  };
+  showLobbyMenu('');
+  const code = new URLSearchParams(location.search).get('room');
+  if(code){ $('joinInput').value=code.toUpperCase(); doJoin(code); }
+}
+
 document.getElementById('endTurnBtn').onclick=()=>{ if(!gameOver) endTurn(); };
-document.getElementById('resetBtn').onclick=reset;
+document.getElementById('resetBtn').onclick=onResetClick;
 document.getElementById('compareBtn').onclick=toggleCompare;
 
 function openRules(e){ e.stopPropagation(); document.getElementById('rulesModal').style.display='flex'; }
@@ -774,6 +1096,7 @@ document.addEventListener('keydown', (e)=>{
 // clicks on empty board squares, the sidebar background, etc.
 document.addEventListener('click', deselectPiece);
 reset();
+initNet();
 </script>
 </body>
 </html>
